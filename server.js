@@ -642,7 +642,9 @@ app.use((err, _req, res, _next) => {
 });
 
 if (isProduction) {
-  app.get("*", (_req, res) => {
+  // In Express 5 / path-to-regexp v6, bare "*" is not a valid path pattern.
+  // Use a catch-all pattern compatible with the newer matcher instead.
+  app.get("/*", (_req, res) => {
     res.sendFile(path.join(__dirname, "dist", "index.html"));
   });
 }
