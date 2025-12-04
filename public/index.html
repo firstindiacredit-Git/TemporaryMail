@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Temp Mail - Inbox</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="layout-root">
+      <!-- Top bar (similar to Gmail header) -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <div class="logo-circle">T</div>
+          <div class="topbar-title">
+            <h1>Temp Mail</h1>
+            <p>Disposable inbox with Gmail-style layout</p>
+          </div>
+        </div>
+        <div class="topbar-center">
+          <div class="search-bar fake-search">
+            <span id="searchDisplay" class="search-placeholder"
+              >No address generated</span
+            >
+          </div>
+        </div>
+        <div class="topbar-right">
+          <button id="generateTopBtn" class="primary">
+            <span>🔄</span>
+            <span>Generate address</span>
+          </button>
+          <button id="refreshBtn" class="secondary" disabled>Refresh</button>
+        </div>
+      </header>
+
+      <!-- Main 3‑column layout -->
+      <main class="app-main">
+        <!-- Left sidebar: mailbox controls -->
+        <aside class="sidebar">
+          <section class="mailbox-card">
+            <div class="card-title">
+              <h2>Temporary Address</h2>
+            </div>
+            <div class="mailbox-content">
+              <div class="address-display">
+                <div class="address-label">
+                  <span class="label-icon">📧</span>
+                  <span class="label-text">Email Address</span>
+                </div>
+                <div class="address-value">
+                  <code id="emailAddress" class="email-address"
+                    >Generate an address</code
+                  >
+                  <button
+                    id="copyBtn"
+                    class="copy-btn"
+                    disabled
+                    title="Copy address"
+                  >
+                    <span class="copy-icon">📋</span>
+                    <span>Copy</span>
+                  </button>
+                </div>
+              </div>
+              <div class="mailbox-actions">
+                <button id="generateBtn" class="primary">
+                  <span>🔄</span>
+                  <span>Generate New</span>
+                </button>
+              </div>
+              <div class="mailbox-status">
+                <div class="status-item">
+                  <span class="status-label">Expires in:</span>
+                  <span id="expiryTimer" class="status-value">--</span>
+                </div>
+                <button id="extendBtn" class="link" disabled>
+                  Extend +15m
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <nav class="folders-nav">
+            <p class="nav-heading">Folders</p>
+            <button class="nav-item active" type="button">
+              <span>📥</span>
+              <span>Inbox</span>
+            </button>
+            <button class="nav-item" type="button" disabled>
+              <span>⭐</span>
+              <span>Starred (coming soon)</span>
+            </button>
+            <button class="nav-item" type="button" disabled>
+              <span>🗑️</span>
+              <span>Trash (coming soon)</span>
+            </button>
+          </nav>
+        </aside>
+
+        <!-- Middle column: thread list -->
+        <section class="inbox-section">
+          <div class="section-header">
+            <h2>Inbox</h2>
+            <p class="inbox-hint">
+              Send an email to the address on the left, then click Refresh.
+            </p>
+          </div>
+
+          <div id="inboxList" class="inbox-list empty">
+            <p>
+              No messages yet. Share the address and refresh after sending an
+              email.
+            </p>
+          </div>
+        </section>
+
+        <!-- Right column: reading pane -->
+        <section class="detail-panel" id="detailPanel" hidden>
+          <header class="detail-header">
+            <div>
+              <p class="label">Selected message</p>
+              <h3 id="detailSubject">Subject preview</h3>
+            </div>
+            <div class="detail-meta">
+              <p id="detailFrom">sender@email.com</p>
+              <p id="detailTime">--</p>
+            </div>
+          </header>
+          <div class="detail-body bg-white text-gray-900" id="detailBody"></div>
+        </section>
+      </main>
+    </div>
+
+    <template id="messageTemplate">
+      <article class="message-card">
+        <div class="message-header">
+          <p class="subject"></p>
+          <p class="meta"></p>
+        </div>
+        <p class="body"></p>
+      </article>
+    </template>
+
+    <script src="app.js" type="module"></script>
+  </body>
+</html>

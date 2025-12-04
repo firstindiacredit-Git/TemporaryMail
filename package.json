@@ -1,0 +1,40 @@
+{
+  "name": "new-folder",
+  "version": "1.0.0",
+  "description": "Lightweight temp mail generator with in-browser inbox",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "server": "node server.js",
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@ant-design/icons": "^5.6.1",
+    "cors": "^2.8.5",
+    "dayjs": "^1.11.19",
+    "express": "^5.1.0",
+    "express-session": "^1.18.2",
+    "passport": "^0.7.0",
+    "passport-microsoft": "^2.1.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.9.6",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.20",
+    "nodemon": "^3.1.11",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.13",
+    "vite": "^5.4.2"
+  }
+}
