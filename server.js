@@ -10,11 +10,21 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-const MAILBOX_TTL_MINUTES = 15;
-const CLEANUP_INTERVAL_MS = 60 * 1000;
+// -----------------------------
+// Environment–driven settings
+// -----------------------------
+const MAILBOX_TTL_MINUTES =
+  Number(process.env.MAILBOX_TTL_MINUTES) > 0
+    ? Number(process.env.MAILBOX_TTL_MINUTES)
+    : 15;
+const CLEANUP_INTERVAL_MS =
+  Number(process.env.CLEANUP_INTERVAL_MS) > 0
+    ? Number(process.env.CLEANUP_INTERVAL_MS)
+    : 60 * 1000;
 const MAILBOX_LOCAL_PART_LENGTH = 10;
 const PASSWORD_LENGTH = 24;
 const MAIL_TM_BASE_URL = process.env.MAIL_TM_BASE_URL || "https://api.mail.tm";
+const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "*";
 const DOMAIN_CACHE_TTL_MS = 10 * 60 * 1000;
 
 let domainRotationIndex = 0;
@@ -490,7 +500,9 @@ const provisionMailboxWithMailTm = async (preferredDomain) => {
 
 app.use(
   cors({
-    origin: "*",
+    // In production you can set FRONTEND_ORIGIN to your deployed frontend URL
+    // e.g. https://temporarymails.vercel.app
+    origin: FRONTEND_ORIGIN,
     methods: ["GET", "POST", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-API-Key"],
     credentials: false,
