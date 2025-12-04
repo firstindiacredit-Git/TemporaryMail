@@ -79,11 +79,29 @@ const mailTmRequest = async (
   }
 
   if (!response.ok) {
-    const error = new Error(
-      data?.detail ||
-        data?.message ||
-        `mail.tm request failed (${response.status})`
-    );
+    // Provide more user-friendly error messages for common status codes
+    let errorMessage = data?.detail || data?.message;
+
+    if (response.status === 404) {
+      errorMessage =
+        errorMessage ||
+        "Mail.tm service endpoint not found. The service may be temporarily unavailable.";
+    } else if (response.status === 429) {
+      errorMessage =
+        errorMessage ||
+        "Too many requests. Please wait a moment and try again.";
+    } else if (response.status === 422) {
+      errorMessage = errorMessage || "Invalid request. Please try again.";
+    } else if (response.status >= 500) {
+      errorMessage =
+        errorMessage ||
+        "Mail.tm service is temporarily unavailable. Please try again later.";
+    } else {
+      errorMessage =
+        errorMessage || `Mail.tm request failed (${response.status})`;
+    }
+
+    const error = new Error(errorMessage);
     error.status = response.status;
     error.data = data;
     throw error;
@@ -303,7 +321,6 @@ const provisionMailboxWithMailTm = async (preferredDomain) => {
     domainsToTry.unshift(besenica);
   }
 
-  
   const asiamailIndex = domainsToTry.findIndex(
     (d) => d.toLowerCase() === "asia-mail.com"
   );
@@ -311,7 +328,7 @@ const provisionMailboxWithMailTm = async (preferredDomain) => {
     const asiamail = domainsToTry.splice(asiamailIndex, 1)[0];
     domainsToTry.unshift(asiamail);
   }
-  
+
   const doerIndex = domainsToTry.findIndex(
     (d) => d.toLowerCase() === "doer.sbs"
   );
@@ -440,14 +457,14 @@ const provisionMailboxWithMailTm = async (preferredDomain) => {
               setTimeout(resolve, 100 + Math.random() * 200)
             );
           }
-          break; 
+          break;
         }
 
-         if ([400, 409].includes(error.status)) {
+        if ([400, 409].includes(error.status)) {
           if (attempt < 1) {
             await new Promise((resolve) => setTimeout(resolve, 50));
           }
-          continue; 
+          continue;
         }
 
         console.log(
@@ -473,7 +490,7 @@ const provisionMailboxWithMailTm = async (preferredDomain) => {
 
 app.use(
   cors({
-    origin: "*", 
+    origin: "*",
     methods: ["GET", "POST", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-API-Key"],
     credentials: false,
@@ -562,6 +579,20 @@ app.post("/api/mailboxes", async (req, res, next) => {
     res.status(201).json(buildMailboxResponse(mailbox));
   } catch (error) {
     console.error("[Mailbox Creation Error]", error.message, error.status);
+
+    // Transform mail.tm API errors into more user-friendly messages
+    if (error.status === 404) {
+      error.message =
+        "Mail.tm service is temporarily unavailable. Please try again in a few moments.";
+    } else if (
+      error.message?.includes("page could not be found") ||
+      error.message?.includes("NOT_FOUND")
+    ) {
+      error.message =
+        "Mail.tm service is temporarily unavailable. Please try again in a few moments.";
+      error.status = 503; // Service Unavailable
+    }
+
     next(error);
   }
 });
@@ -632,7 +663,13 @@ if (isProduction) {
   });
 }
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Temp mail service listening on http://localhost:${PORT}`);
-});
+// Export for Vercel serverless functions
+export default app;
+
+// Only start listening if not in Vercel environment
+if (process.env.VERCEL !== "1") {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`Temp mail service listening on http://localhost:${PORT}`);
+  });
+}
