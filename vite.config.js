@@ -17,7 +17,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: [process.env.NODE_ENV === 'production' ? 'https://temporarymails.pizeonfly.com' : 'http://localhost:3000'],
         changeOrigin: true,
         secure: false,
         ws: true,
