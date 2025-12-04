@@ -672,7 +672,8 @@ app.use((err, _req, res, _next) => {
 // In Vercel, we need to handle non-API routes to serve the React app
 if (process.env.VERCEL || process.env.VERCEL_ENV) {
   // In Vercel, serve index.html for non-API routes (for client-side routing)
-  app.get("*", (req, res, next) => {
+  // Express 5 / path-to-regexp no longer supports bare "*" — use "/*" instead
+  app.get("/*", (req, res, next) => {
     // Skip API routes - they should be handled above
     if (req.path.startsWith("/api/")) {
       return next();
@@ -724,7 +725,8 @@ if (process.env.VERCEL || process.env.VERCEL_ENV) {
   });
 } else if (isProduction) {
   // Local production - serve from dist
-  app.get("*", (_req, res) => {
+  // Use "/*" instead of "*" for Express 5 compatibility
+  app.get("/*", (_req, res) => {
     res.sendFile(path.join(__dirname, "dist", "index.html"));
   });
 }
