@@ -79,13 +79,29 @@ const mailTmRequest = async (
   }
 
   if (!response.ok) {
-    const error = new Error(
+    // Handle cases where mail.tm returns an HTML "NOT_FOUND" page instead of JSON
+    let messageFromRemote =
       data?.detail ||
-        data?.message ||
-        `mail.tm request failed (${response.status})`
-    );
+      data?.message ||
+      `mail.tm request failed (${response.status})`;
+
+    const lowerText = (text || "").toLowerCase();
+    if (
+      lowerText.includes("not_found") ||
+      lowerText.includes("the page could not be found")
+    ) {
+      // Normalize the message so frontend doesn't see raw HTML / opaque IDs
+      messageFromRemote =
+        "Mailbox provider is temporarily unavailable (NOT_FOUND). Please try again in a few seconds.";
+    }
+
+    const error = new Error(messageFromRemote);
     error.status = response.status;
     error.data = data;
+    // Preserve a small snippet of the raw body for server-side debugging
+    if (!data && text) {
+      error.rawBodySnippet = text.slice(0, 200);
+    }
     throw error;
   }
 
