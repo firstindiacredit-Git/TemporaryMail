@@ -110,17 +110,10 @@ function HomePage({ user, onLogout, onLogin }) {
       // If all domains are currently rate-limited, don't spam the user with alerts
       if (
         message.includes('All domains are currently rate-limited') ||
-        message.includes('Unable to allocate mailbox') ||
-        message.includes('temporarily unavailable')
+        message.includes('Unable to allocate mailbox')
       ) {
-        console.warn('Mailbox service is currently unavailable. Please wait a few seconds and try again.');
+        console.warn('Mailbox service is currently rate-limited. Please wait a few seconds and try again.');
         // Optionally, you could show a subtle UI notice/toast here instead of an alert
-        return;
-      }
-
-      // Handle NOT_FOUND errors specifically
-      if (message.includes('page could not be found') || message.includes('NOT_FOUND')) {
-        console.warn('Mail.tm service is temporarily unavailable. Please try again in a few moments.');
         return;
       }
 
@@ -300,21 +293,6 @@ function App() {
       <Route 
         path="/api-docs" 
         element={<ApiDocsPage user={user} onLogout={handleLogout} onLogin={handleLogin} />} 
-      />
-      <Route 
-        path="*" 
-        element={
-          <div className="layout-root" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', flexDirection: 'column', gap: '1rem' }}>
-            <h1 style={{ fontSize: '2rem', margin: 0 }}>404 - Page Not Found</h1>
-            <p>The page you're looking for doesn't exist.</p>
-            <button 
-              onClick={() => window.location.href = '/'}
-              style={{ padding: '0.5rem 1rem', cursor: 'pointer' }}
-            >
-              Go to Home
-            </button>
-          </div>
-        } 
       />
     </Routes>
   );

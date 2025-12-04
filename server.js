@@ -10,21 +10,11 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// -----------------------------
-// Environment–driven settings
-// -----------------------------
-const MAILBOX_TTL_MINUTES =
-  Number(process.env.MAILBOX_TTL_MINUTES) > 0
-    ? Number(process.env.MAILBOX_TTL_MINUTES)
-    : 15;
-const CLEANUP_INTERVAL_MS =
-  Number(process.env.CLEANUP_INTERVAL_MS) > 0
-    ? Number(process.env.CLEANUP_INTERVAL_MS)
-    : 60 * 1000;
+const MAILBOX_TTL_MINUTES = 15;
+const CLEANUP_INTERVAL_MS = 60 * 1000;
 const MAILBOX_LOCAL_PART_LENGTH = 10;
 const PASSWORD_LENGTH = 24;
 const MAIL_TM_BASE_URL = process.env.MAIL_TM_BASE_URL || "https://api.mail.tm";
-const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "*";
 const DOMAIN_CACHE_TTL_MS = 10 * 60 * 1000;
 
 let domainRotationIndex = 0;
@@ -89,29 +79,11 @@ const mailTmRequest = async (
   }
 
   if (!response.ok) {
-    // Provide more user-friendly error messages for common status codes
-    let errorMessage = data?.detail || data?.message;
-
-    if (response.status === 404) {
-      errorMessage =
-        errorMessage ||
-        "Mail.tm service endpoint not found. The service may be temporarily unavailable.";
-    } else if (response.status === 429) {
-      errorMessage =
-        errorMessage ||
-        "Too many requests. Please wait a moment and try again.";
-    } else if (response.status === 422) {
-      errorMessage = errorMessage || "Invalid request. Please try again.";
-    } else if (response.status >= 500) {
-      errorMessage =
-        errorMessage ||
-        "Mail.tm service is temporarily unavailable. Please try again later.";
-    } else {
-      errorMessage =
-        errorMessage || `Mail.tm request failed (${response.status})`;
-    }
-
-    const error = new Error(errorMessage);
+    const error = new Error(
+      data?.detail ||
+        data?.message ||
+        `mail.tm request failed (${response.status})`
+    );
     error.status = response.status;
     error.data = data;
     throw error;
@@ -500,9 +472,7 @@ const provisionMailboxWithMailTm = async (preferredDomain) => {
 
 app.use(
   cors({
-    // In production you can set FRONTEND_ORIGIN to your deployed frontend URL
-    // e.g. https://temporarymails.vercel.app
-    origin: FRONTEND_ORIGIN,
+    origin: "*",
     methods: ["GET", "POST", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-API-Key"],
     credentials: false,
@@ -511,18 +481,11 @@ app.use(
 
 app.use(express.json({ limit: "100kb" }));
 
-const isProduction =
-  process.env.NODE_ENV === "production" ||
-  process.env.VERCEL === "1" ||
-  process.env.VERCEL_ENV;
-// In Vercel, static files are served separately, so we only serve static files in non-Vercel environments
-const staticPath =
-  isProduction && !process.env.VERCEL && !process.env.VERCEL_ENV
-    ? path.join(__dirname, "dist")
-    : path.join(__dirname, "public");
-if (!process.env.VERCEL && !process.env.VERCEL_ENV) {
-  app.use(express.static(staticPath));
-}
+const isProduction = process.env.NODE_ENV === "production";
+const staticPath = isProduction
+  ? path.join(__dirname, "dist")
+  : path.join(__dirname, "public");
+app.use(express.static(staticPath));
 
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", mailboxes: mailboxes.size });
@@ -581,18 +544,14 @@ const createMailbox = async (preferredDomain) => {
   return mailbox;
 };
 
-// Only run cleanup interval in non-serverless environments
-// In serverless (Vercel), each function invocation is stateless, so cleanup happens naturally
-if (!process.env.VERCEL && !process.env.VERCEL_ENV) {
-  setInterval(() => {
-    const now = dayjs();
-    mailboxes.forEach((mailbox, mailboxId) => {
-      if (now.isAfter(mailbox.expiresAt)) {
-        mailboxes.delete(mailboxId);
-      }
-    });
-  }, CLEANUP_INTERVAL_MS).unref();
-}
+setInterval(() => {
+  const now = dayjs();
+  mailboxes.forEach((mailbox, mailboxId) => {
+    if (now.isAfter(mailbox.expiresAt)) {
+      mailboxes.delete(mailboxId);
+    }
+  });
+}, CLEANUP_INTERVAL_MS).unref();
 
 app.post("/api/mailboxes", async (req, res, next) => {
   try {
@@ -602,20 +561,6 @@ app.post("/api/mailboxes", async (req, res, next) => {
     res.status(201).json(buildMailboxResponse(mailbox));
   } catch (error) {
     console.error("[Mailbox Creation Error]", error.message, error.status);
-
-    // Transform mail.tm API errors into more user-friendly messages
-    if (error.status === 404) {
-      error.message =
-        "Mail.tm service is temporarily unavailable. Please try again in a few moments.";
-    } else if (
-      error.message?.includes("page could not be found") ||
-      error.message?.includes("NOT_FOUND")
-    ) {
-      error.message =
-        "Mail.tm service is temporarily unavailable. Please try again in a few moments.";
-      error.status = 503; // Service Unavailable
-    }
-
     next(error);
   }
 });
@@ -680,79 +625,13 @@ app.use((err, _req, res, _next) => {
   });
 });
 
-// Serve React app for all non-API routes
-// In Vercel, we need to handle non-API routes to serve the React app
-if (process.env.VERCEL || process.env.VERCEL_ENV) {
-  // In Vercel, serve index.html for non-API routes (for client-side routing)
-  // Express 5 / path-to-regexp no longer supports bare "*" — use "/*" instead
-  app.get("/*", (req, res, next) => {
-    // Skip API routes - they should be handled above
-    if (req.path.startsWith("/api/")) {
-      return next();
-    }
-
-    // Try to serve index.html from dist or public
-    try {
-      const distPath = path.join(__dirname, "dist", "index.html");
-      res.sendFile(distPath, (err) => {
-        if (err) {
-          try {
-            const publicPath = path.join(__dirname, "public", "index.html");
-            res.sendFile(publicPath, (err2) => {
-              if (err2) {
-                console.error("Failed to serve index.html:", err2.message);
-                // Return a simple fallback HTML
-                res.status(200).type("html").send(`
-                  <!DOCTYPE html>
-                  <html>
-                    <head>
-                      <title>Temp Mail</title>
-                      <meta charset="utf-8">
-                    </head>
-                    <body>
-                      <h1>Temp Mail Service</h1>
-                      <p>Loading...</p>
-                      <script>window.location.reload();</script>
-                    </body>
-                  </html>
-                `);
-              }
-            });
-          } catch (e) {
-            console.error("Error serving index.html:", e);
-            res.status(200).type("html").send(`
-              <!DOCTYPE html>
-              <html>
-                <head><title>Temp Mail</title></head>
-                <body><h1>Temp Mail Service</h1><p>Please refresh the page.</p></body>
-              </html>
-            `);
-          }
-        }
-      });
-    } catch (error) {
-      console.error("Error in catch-all route:", error);
-      res.status(500).json({ error: "Internal server error", status: 500 });
-    }
-  });
-} else if (isProduction) {
-  // Local production - serve from dist
-  // Use "/*" instead of "*" for Express 5 compatibility
-  app.get("/*", (_req, res) => {
+if (isProduction) {
+  app.get("*", (_req, res) => {
     res.sendFile(path.join(__dirname, "dist", "index.html"));
   });
 }
 
-// Export for Vercel serverless functions
-// Vercel expects a handler function
-const handler = app;
-
-// Only start listening if not in Vercel environment
-if (process.env.VERCEL !== "1" && !process.env.VERCEL_ENV) {
-  const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => {
-    console.log(`Temp mail service listening on http://localhost:${PORT}`);
-  });
-}
-
-export default handler;
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Temp mail service listening on http://localhost:${PORT}`);
+});

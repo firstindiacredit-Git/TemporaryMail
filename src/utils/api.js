@@ -10,12 +10,6 @@ export const api = {
       } catch {
         message = errorText || message;
       }
-      
-      // Handle specific error cases
-      if (message.includes("page could not be found") || message.includes("NOT_FOUND")) {
-        message = "Mail.tm service is temporarily unavailable. Please try again in a few moments.";
-      }
-      
       throw new Error(message);
     }
     return res.json();
