@@ -499,11 +499,18 @@ app.use(
 
 app.use(express.json({ limit: "100kb" }));
 
-const isProduction = process.env.NODE_ENV === "production";
-const staticPath = isProduction
-  ? path.join(__dirname, "dist")
-  : path.join(__dirname, "public");
-app.use(express.static(staticPath));
+const isProduction =
+  process.env.NODE_ENV === "production" ||
+  process.env.VERCEL === "1" ||
+  process.env.VERCEL_ENV;
+// In Vercel, static files are served separately, so we only serve static files in non-Vercel environments
+const staticPath =
+  isProduction && !process.env.VERCEL && !process.env.VERCEL_ENV
+    ? path.join(__dirname, "dist")
+    : path.join(__dirname, "public");
+if (!process.env.VERCEL && !process.env.VERCEL_ENV) {
+  app.use(express.static(staticPath));
+}
 
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", mailboxes: mailboxes.size });
@@ -562,14 +569,18 @@ const createMailbox = async (preferredDomain) => {
   return mailbox;
 };
 
-setInterval(() => {
-  const now = dayjs();
-  mailboxes.forEach((mailbox, mailboxId) => {
-    if (now.isAfter(mailbox.expiresAt)) {
-      mailboxes.delete(mailboxId);
-    }
-  });
-}, CLEANUP_INTERVAL_MS).unref();
+// Only run cleanup interval in non-serverless environments
+// In serverless (Vercel), each function invocation is stateless, so cleanup happens naturally
+if (!process.env.VERCEL && !process.env.VERCEL_ENV) {
+  setInterval(() => {
+    const now = dayjs();
+    mailboxes.forEach((mailbox, mailboxId) => {
+      if (now.isAfter(mailbox.expiresAt)) {
+        mailboxes.delete(mailboxId);
+      }
+    });
+  }, CLEANUP_INTERVAL_MS).unref();
+}
 
 app.post("/api/mailboxes", async (req, res, next) => {
   try {
@@ -657,14 +668,70 @@ app.use((err, _req, res, _next) => {
   });
 });
 
-if (isProduction) {
+// Serve React app for all non-API routes
+// In Vercel, we need to handle non-API routes to serve the React app
+if (process.env.VERCEL || process.env.VERCEL_ENV) {
+  // In Vercel, serve index.html for non-API routes (for client-side routing)
+  app.get("*", (req, res, next) => {
+    // Skip API routes - they should be handled above
+    if (req.path.startsWith("/api/")) {
+      return next();
+    }
+
+    // Try to serve index.html from dist or public
+    try {
+      const distPath = path.join(__dirname, "dist", "index.html");
+      res.sendFile(distPath, (err) => {
+        if (err) {
+          try {
+            const publicPath = path.join(__dirname, "public", "index.html");
+            res.sendFile(publicPath, (err2) => {
+              if (err2) {
+                console.error("Failed to serve index.html:", err2.message);
+                // Return a simple fallback HTML
+                res.status(200).type("html").send(`
+                  <!DOCTYPE html>
+                  <html>
+                    <head>
+                      <title>Temp Mail</title>
+                      <meta charset="utf-8">
+                    </head>
+                    <body>
+                      <h1>Temp Mail Service</h1>
+                      <p>Loading...</p>
+                      <script>window.location.reload();</script>
+                    </body>
+                  </html>
+                `);
+              }
+            });
+          } catch (e) {
+            console.error("Error serving index.html:", e);
+            res.status(200).type("html").send(`
+              <!DOCTYPE html>
+              <html>
+                <head><title>Temp Mail</title></head>
+                <body><h1>Temp Mail Service</h1><p>Please refresh the page.</p></body>
+              </html>
+            `);
+          }
+        }
+      });
+    } catch (error) {
+      console.error("Error in catch-all route:", error);
+      res.status(500).json({ error: "Internal server error", status: 500 });
+    }
+  });
+} else if (isProduction) {
+  // Local production - serve from dist
   app.get("*", (_req, res) => {
     res.sendFile(path.join(__dirname, "dist", "index.html"));
   });
 }
 
 // Export for Vercel serverless functions
-export default app;
+// Vercel expects a handler function
+const handler = app;
 
 // Only start listening if not in Vercel environment
 if (process.env.VERCEL !== "1" && !process.env.VERCEL_ENV) {
@@ -673,3 +740,5 @@ if (process.env.VERCEL !== "1" && !process.env.VERCEL_ENV) {
     console.log(`Temp mail service listening on http://localhost:${PORT}`);
   });
 }
+
+export default handler;
